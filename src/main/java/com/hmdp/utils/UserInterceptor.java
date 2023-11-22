@@ -16,7 +16,7 @@ public class UserInterceptor implements HandlerInterceptor {
         // 1、获取session
         HttpSession session = request.getSession();
         // 2、判断用户是否存在
-        User user = (User) session.getAttribute("user");
+        UserDTO user = (UserDTO) session.getAttribute("user");
         // 3、不存在拦截
         if(user==null){
             response.setStatus(401);
