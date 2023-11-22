@@ -1,14 +1,17 @@
 
 package com.hmdp.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -49,8 +52,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,User> implements IUs
             user1.setPhone(phone);
 
         }
+        UserDTO userDTO = BeanUtil.copyProperties(user,UserDTO.class);
         // 5、保存到session中
-        session.setAttribute("user",user);
+        session.setAttribute("user", userDTO);
         return Result.ok();
     }
 }

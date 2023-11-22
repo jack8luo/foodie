@@ -1,5 +1,6 @@
 package com.hmdp.utils;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -22,7 +23,8 @@ public class UserInterceptor implements HandlerInterceptor {
             return false;
         }
         // 4、存入ThreadLoacl、放行
-        UserHolder.saveUser(user);
+        UserDTO userDTO = BeanUtil.copyProperties(user,UserDTO.class);
+        UserHolder.saveUser(userDTO);
         return true;
     }
 

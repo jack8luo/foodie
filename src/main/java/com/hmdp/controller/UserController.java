@@ -46,7 +46,7 @@ public class UserController {
      */
     @PostMapping("code")
     public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
-        // TODO 发送短信验证码并保存验证码
+        //  发送短信验证码并保存验证码
         // 1、获取手机号
         Object code = session.getAttribute("code");
         // 2、校验手机号
@@ -89,7 +89,7 @@ public class UserController {
     @GetMapping("/me")
     public Result me(){
         // TODO 获取当前登录的用户并返回
-        User user = UserHolder.getUser();
+        UserDTO user = UserHolder.getUser();
         return Result.ok(user);
     }
 
