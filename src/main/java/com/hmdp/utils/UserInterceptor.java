@@ -18,31 +18,15 @@ import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 
 
 public class UserInterceptor implements HandlerInterceptor {
-    // 在Mvc配置类中输入StringRedisTemplate的Bean供UserInterceptor使用
-    private StringRedisTemplate stringRedisTemplate;
-    public UserInterceptor(StringRedisTemplate stringRedisTemplate){
-        this.stringRedisTemplate=stringRedisTemplate;
-    }
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 1、从请求头中获取token
-        String token = request.getHeader("authorization");
-        if(StrUtil.isBlank(token)){
-            return false;
-        }
-        // 2、判断用户是否存在
-        Map<Object, Object> user = stringRedisTemplate.opsForHash().entries(LOGIN_USER_KEY + token);
-        // 3、不存在拦截
-        if(user.isEmpty()){
+        // 1.判断是否需要拦截（ThreadLocal中是否有用户）
+        // tip:ThreadLocal是线程隔离的，所以一个客户端都有一个线程空间，
+        // 线程的生命周期比请求的生命周期长，这也就是后面将要学习到的ThreadLocal内存泄露有关
+        if(UserHolder.getUser()==null){
             response.setStatus(401);
             return false;
         }
-        // 4、存入ThreadLoacl、放行
-        // 4.1、将查询到的hash数据转为UserDTO
-        UserDTO userDTO = BeanUtil.fillBeanWithMap(user, new UserDTO(), false);
-        UserHolder.saveUser(userDTO);
-        // 5、刷新token有效期
-        stringRedisTemplate.expire(LOGIN_USER_KEY + token,30, TimeUnit.MINUTES);
         return true;
     }
 
