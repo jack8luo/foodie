@@ -14,13 +14,17 @@ import com.hmdp.utils.RegexPatterns;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import static com.baomidou.mybatisplus.core.toolkit.Wrappers.query;
+import static com.hmdp.utils.RedisConstants.LOGIN_CODE_KEY;
 
 /**
  * <p>
@@ -41,6 +45,8 @@ public class UserController {
     @Resource
     private IUserInfoService userInfoService;
 
+    @Autowired
+    StringRedisTemplate stringRedisTemplate;
     /**
      * 发送手机验证码
      */
@@ -48,7 +54,6 @@ public class UserController {
     public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
         //  发送短信验证码并保存验证码
         // 1、获取手机号
-        Object code = session.getAttribute("code");
         // 2、校验手机号
         String  phone1 = (String) session.getAttribute("phone");
         if(!RegexUtils.isPhoneInvalid(phone1))
@@ -58,8 +63,9 @@ public class UserController {
         }
         // 4、生成验证码
         String  random = RandomUtil.randomNumbers(6);
-        // 5、保存到session
-        session.setAttribute("code",random);
+        // 5、保存到redis
+        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY,random);
+        stringRedisTemplate.expire(LOGIN_CODE_KEY,2, TimeUnit.MINUTES);
         // 6、发送验证码
         log.debug("code:"+random);
         // 7、返回
