@@ -31,7 +31,6 @@ public class RefreshingInterceptor implements HandlerInterceptor {
         Map<Object, Object> user = stringRedisTemplate.opsForHash().entries(LOGIN_USER_KEY + token);
         // 3、不存在拦截
         if(user.isEmpty()){
-            response.setStatus(401);
             return true;
         }
         // 4、存入ThreadLoacl、放行
