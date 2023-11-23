@@ -32,50 +32,50 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
     @Autowired
     StringRedisTemplate stringRedisTemplate;
     // 1、string类型
-    // @Override
-    // public Result shoptypelist() {
-    //     // 1、查询redis
-    //     String key = "KEY:SHOPTYPE:ID:1";
-    //     String shoptype = stringRedisTemplate.opsForValue().get(key);
-    //     // 2、命中直接返回
-    //     if(shoptype!=null){
-    //         List<ShopType> shopType = new ArrayList<>();
-    //         // tip：JSON.toList将JSON转为List集合对象。
-    //         List<ShopType> shopTypeList = JSONUtil.toList(shoptype, ShopType.class);
-    //         return Result.ok(shopTypeList);
-    //     }
-    //     // 3、未命中查数据库
-    //     List<ShopType> typeList = typeService.query().orderByAsc("sort").list();
-    //     if(typeList == null){
-    //         // 4、未命中返回失败
-    //         return Result.fail("店铺种类不存在!");
-    //     }
-    //     // 5、命中存入redis
-    //     // tip:JSONUtil.toJsonStr(typeList)将对象转为JSON，与JSON.toList将JSON转为List集合对象-匹配
-    //     // StrUtil.toString(typeList)将对象转为String
-
-    //     // String shoptypestr = StrUtil.toString(typeList);
-    //     String shoptypestr = JSONUtil.toJsonStr(typeList);
-    //     stringRedisTemplate.opsForValue().set(key,shoptypestr);
-    //     // 6、返回种类信息
-    //     return Result.ok(typeList);
-    // }
-    // 2、List类型
     @Override
     public Result shoptypelist() {
-    String key = "Cache:TypeList:List";
-    //@ZYL：先查找缓存
-    String shopTypeString = stringRedisTemplate.opsForList().leftPop(key);
+        // 1、查询redis
+        String key = "KEY:SHOPTYPE:ID:1";
+        String shoptype = stringRedisTemplate.opsForValue().get(key);
+        // 2、命中直接返回
+        if(shoptype!=null){
+            List<ShopType> shopType = new ArrayList<>();
+            // tip：JSON.toList将JSON转为List集合对象。
+            List<ShopType> shopTypeList = JSONUtil.toList(shoptype, ShopType.class);
+            return Result.ok(shopTypeList);
+        }
+        // 3、未命中查数据库
+        List<ShopType> typeList = typeService.query().orderByAsc("sort").list();
+        if(typeList == null){
+            // 4、未命中返回失败
+            return Result.fail("店铺种类不存在!");
+        }
+        // 5、命中存入redis
+        // tip:JSONUtil.toJsonStr(typeList)将对象转为JSON，与JSON.toList将JSON转为List集合对象-匹配
+        // StrUtil.toString(typeList)将对象转为String
 
-    //@ZYL：缓存找到了就直接返回
-    if (StrUtil.isNotBlank(shopTypeString)) {
-        return Result.ok(JSONUtil.toList(shopTypeString,ShopType.class));
+        // String shoptypestr = StrUtil.toString(typeList);
+        String shoptypestr = JSONUtil.toJsonStr(typeList);
+        stringRedisTemplate.opsForValue().set(key,shoptypestr);
+        // 6、返回种类信息
+        return Result.ok(typeList);
     }
-
-    //@ZYL：缓存找不到(隐含逻辑：if判断失败了，此处相当于else部分 )，再找数据库
-    List<ShopType> shopTypeList = query().orderByAsc("sort").list();
-        stringRedisTemplate.opsForList().leftPush(key, JSONUtil.toJsonStr(shopTypeList));
-        return Result.ok(shopTypeList);
-    }
+    // 2、List类型
+    // @Override
+    // public Result shoptypelist() {
+    // String key = "Cache:TypeList:List";
+    // //@ZYL：先查找缓存
+    // String shopTypeString = stringRedisTemplate.opsForList().leftPop(key);
+    //
+    // //@ZYL：缓存找到了就直接返回
+    // if (StrUtil.isNotBlank(shopTypeString)) {
+    //     return Result.ok(JSONUtil.toList(shopTypeString,ShopType.class));
+    // }
+    //
+    // //@ZYL：缓存找不到(隐含逻辑：if判断失败了，此处相当于else部分 )，再找数据库
+    // List<ShopType> shopTypeList = query().orderByAsc("sort").list();
+    //     stringRedisTemplate.opsForList().leftPush(key, JSONUtil.toJsonStr(shopTypeList));
+    //     return Result.ok(shopTypeList);
+    // }
 
 }
