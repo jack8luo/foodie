@@ -1,16 +1,20 @@
 package com.hmdp.utils;
 
 public class RedisConstants {
+    // 验证码KEY
     public static final String LOGIN_CODE_KEY = "login:code:";
     public static final Long LOGIN_CODE_TTL = 2L;
+    // 登录校验key
     public static final String LOGIN_USER_KEY = "login:token:";
     public static final Long LOGIN_USER_TTL = 36000L;
 
     public static final Long CACHE_NULL_TTL = 2L;
 
     public static final Long CACHE_SHOP_TTL = 30L;
+    // 缓存店铺信息key，
     public static final String CACHE_SHOP_KEY = "cache:shop:";
 
+    // 互斥锁key
     public static final String LOCK_SHOP_KEY = "lock:shop:";
     public static final Long LOCK_SHOP_TTL = 10L;
 
