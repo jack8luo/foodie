@@ -11,6 +11,7 @@ import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.RedisClient;
 import com.hmdp.utils.RedisData;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,16 +41,21 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Autowired
     StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    RedisClient redisClient;
     // 缓存穿透
     @Override
     public Result shopgetById(Long id) {
         // 缓存穿透
         // Shop shop = queryWithPassThrough(id);
-
+        // Shop shop = redisClient.queryWithPassThrough(
+        //         CACHE_SHOP_KEY,id,Shop.class,this::getById,2L,TimeUnit.MINUTES);
         // 缓存击穿
         // Shop shop = queryWithMutex(id);
-
-        Shop shop = queryWithLogicalExpire(id);
+        Shop shop = redisClient.queryWithMutex(LOCK_SHOP_KEY,id,Shop.class,this::getById,2L,TimeUnit.SECONDS);
+        // Shop shop = queryWithLogicalExpire(id);
+        // Shop shop = redisClient.queryWithLogicalExpire(
+        //         CACHE_SHOP_KEY,id,Shop.class,this::getById,10L,TimeUnit.SECONDS);
         if(shop == null)
         {
             return Result.fail("店铺不存在");
@@ -57,9 +63,10 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shop);
     }
     private static final ExecutorService CACHE_REBULID_EXECUTOR = Executors.newFixedThreadPool(10);
+    // 逻辑过期解决缓存击穿
     public Shop queryWithLogicalExpire(Long id){
         // 1、根据id查redis
-        String key = CACHE_SHOP_KEY+id;
+        String key = ""+id;
         String shopform = stringRedisTemplate.opsForValue().get(key);
         // 2、判断是否命中
         if(!StrUtil.isNotBlank(shopform)){
@@ -71,6 +78,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         RedisData redisData = JSONUtil.toBean(shopform, RedisData.class);
         LocalDateTime expireTime = redisData.getExpireTime();
         // TODO 不可以吧redisData转成string吗
+        //
         Shop shop = JSONUtil.toBean((JSONObject) redisData.getData(),Shop.class);
         if (expireTime.isAfter(LocalDateTime.now())){
             // 没过期直接返回
