@@ -23,6 +23,7 @@ public class MvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(new UserInterceptor()).excludePathPatterns(
                 "/shop/**",
                 "/voucher/**",
+                "/voucher-order/**",
                 "/shop-type/**",
                 "/upload/**",
                 "/blog/hot",
