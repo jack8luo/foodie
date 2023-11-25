@@ -1,17 +1,18 @@
 package com.hmdp.service.impl;
 
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
-import com.hmdp.entity.User;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     RedisIdWorker redisIdWorker;
 
+    @Autowired
+    StringRedisTemplate stringRedisTemplate;
     // 这里只做查询，不用事务。对数据进行操作才加上事务。
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -49,15 +52,25 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long user_id = UserHolder.getUser().getId();
-        synchronized (user_id.toString().intern()){
-            // intern() 这个方法是从常量池中拿到数据，如果我们直接使用userId.toString() 他拿到的对象实际上是不同的对象，
-            // new出来的对象，我们使用锁必须保证锁必须是同一把，所以我们需要使用intern()方法
+        SimpleRedisLock simpleRedisLock = new SimpleRedisLock("order:" + user_id, stringRedisTemplate);
+        boolean b = simpleRedisLock.tryLock(1200);
+        if (!b)
+        {
+            return Result.fail("不能重复下单！");
+        }
+        // intern() 这个方法是从常量池中拿到数据，如果我们直接使用userId.toString() 他拿到的对象实际上是不同的对象，
+        // new出来的对象，我们使用锁必须保证锁必须是同一把，所以我们需要使用intern()方法
+        try {
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
-        //     ==this.createVoucherOrder(voucherId),这属于事务失效的一种情况
-        //     spring AOP机制实现事务，而实现事务需要获取这个类的代理对象，
-        //     而this.createVoucherOrder(voucherId)获得的是VoucherOrderServiceImpl这个对象，不是代理对象
+        } finally {
+            simpleRedisLock.delLock();
+
         }
+        //     ==this.createVoucherOrder(voucherId),这属于事务失效的一种情况
+    //     spring AOP机制实现事务，而实现事务需要获取这个类的代理对象，
+    //     而this.createVoucherOrder(voucherId)获得的是VoucherOrderServiceImpl这个对象，不是代理对象
+
     }
 
     // 在事务中使用锁，这意味着，尽管当前线程的事务尚未完成，其他线程可能已经能够访问被锁保护的资源，这可能导致数据不一致或其他线程看到未提交的数据。
