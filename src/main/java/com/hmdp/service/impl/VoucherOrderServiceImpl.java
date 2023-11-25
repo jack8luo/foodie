@@ -1,6 +1,8 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.lang.UUID;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.config.RedissonConfig;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
@@ -10,6 +12,7 @@ import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.locks.Lock;
 
 /**
  * <p>
@@ -36,6 +40,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Autowired
     StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    RedissonClient redissonClient;
     // 这里只做查询，不用事务。对数据进行操作才加上事务。
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -52,8 +58,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long user_id = UserHolder.getUser().getId();
-        SimpleRedisLock simpleRedisLock = new SimpleRedisLock("order:" + user_id, stringRedisTemplate);
-        boolean b = simpleRedisLock.tryLock(1200);
+        //创建锁对象 这个代码不用了，因为我们现在要使用分布式锁
+        // SimpleRedisLock simpleRedisLock = new SimpleRedisLock("order:" + user_id, stringRedisTemplate);
+        // boolean b = simpleRedisLock.tryLock(1200);
+        Lock lock = redissonClient.getLock("order:" + user_id);
+        boolean b = lock.tryLock();
         if (!b)
         {
             return Result.fail("不能重复下单！");
@@ -64,8 +73,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
         } finally {
-            simpleRedisLock.delLock();
-
+            // simpleRedisLock.delLock();
+            lock.unlock();
         }
         //     ==this.createVoucherOrder(voucherId),这属于事务失效的一种情况
     //     spring AOP机制实现事务，而实现事务需要获取这个类的代理对象，
