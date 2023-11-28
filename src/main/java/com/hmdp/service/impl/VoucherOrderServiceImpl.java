@@ -1,26 +1,29 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.lang.UUID;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.hmdp.config.RedissonConfig;
 import com.hmdp.dto.Result;
-import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.utils.RedisIdWorker;
-import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
+import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.concurrent.locks.Lock;
+import javax.annotation.PostConstruct;
+import java.util.Collections;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * <p>
@@ -42,7 +45,131 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     StringRedisTemplate stringRedisTemplate;
     @Autowired
     RedissonClient redissonClient;
-    // 这里只做查询，不用事务。对数据进行操作才加上事务。
+
+    /*秒杀优化：将库存是否足够和一人一单的判断逻辑放入redis中去判断*/
+    private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
+    static {
+        UNLOCK_SCRIPT = new DefaultRedisScript<>();
+        UNLOCK_SCRIPT.setLocation(new ClassPathResource("SECKILL_SCRIPT.lua"));
+        UNLOCK_SCRIPT.setResultType(Long.class);
+    }
+
+    // seckillVoucher秒杀券购买处理
+    @Override
+    public Result seckillVoucher(Long voucherId) {
+    //     0、获取用户id、订单id
+        Long userid = UserHolder.getUser().getId();
+        long orderid = redisIdWorker.nextId("order");
+        //     1、执行lua脚本
+        Long execute = stringRedisTemplate.execute(
+                UNLOCK_SCRIPT,
+                Collections.emptyList(),
+                voucherId.toString(), userid.toString(), String.valueOf(orderid)
+        );
+        //     2、判断结果是否为0
+        int r = execute.intValue();
+        if (r!=0){
+            return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+        }
+    //     3、TODO 保存到阻塞队列
+    //     3.1 封装voucherOrder订单
+        VoucherOrder voucherOrder = new VoucherOrder();
+        // 2.3.订单id
+        long orderId = redisIdWorker.nextId("order");
+        voucherOrder.setId(orderId);
+        // 2.4.用户id
+        voucherOrder.setUserId(userid);
+        // 2.5.代金券id
+        voucherOrder.setVoucherId(voucherId);
+        orderTasks.add(voucherOrder);
+    //     4、返回订单ID
+        return Result.ok(orderid);
+    }
+
+
+    //异步处理线程池
+    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    //在类初始化之后执行，因为当这个类初始化好了之后，随时都是有可能要执行的
+    @PostConstruct
+    private void init() {
+        SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
+    }
+    // 创建Array阻塞队列
+    private BlockingQueue<VoucherOrder> orderTasks =new ArrayBlockingQueue<>(1024 * 1024);
+    // 用于线程池处理的任务
+    // 当初始化完毕后，就会去从对列中去拿信息
+    private class VoucherOrderHandler implements Runnable {
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    // 1.获取队列中的订单信息
+                    VoucherOrder voucherOrder = orderTasks.take();
+                    // 2.创建订单
+                    handleVoucherOrder(voucherOrder);
+                } catch (Exception e) {
+                    log.error("处理订单异常", e);
+                }
+            }
+        }
+    }
+    // 创建代理对象
+    IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+    // 创建订单：使用Redisson分布式可重入锁
+    private void handleVoucherOrder(VoucherOrder voucherOrder) {
+//1.获取用户
+        Long userId = voucherOrder.getUserId();
+        // 2.创建锁对象
+        RLock redisLock = redissonClient.getLock("lock:order:" + userId);
+        // 3.尝试获取锁
+        boolean isLock = redisLock.tryLock();
+        // 4.判断是否获得锁成功
+        if (!isLock) {
+            // 获取锁失败，直接返回失败或者重试
+            log.error("不允许重复下单！");
+            return;
+        }
+        try {
+            // IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            // 注意：由于是spring的代理对象（事务）是放在threadLocal中，此时的是子线程，是不能从threadLocal得到东西的
+
+            proxy.createVoucherOrder(voucherOrder);
+        } finally {
+            // 释放锁
+            redisLock.unlock();
+        }
+    }
+    @Transactional
+    @Override
+    public void createVoucherOrder(VoucherOrder voucherOrder) {
+        Long userId = voucherOrder.getUserId();
+        // 5.1.查询订单
+        int count = query().eq("user_id", userId).eq("voucher_id", voucherOrder.getVoucherId()).count();
+        // 5.2.判断是否存在
+        if (count > 0) {
+            // 用户已经购买过了
+            log.error("用户已经购买过了");
+            return ;
+        }
+
+        // 6.扣减库存
+        boolean success = iseckillVoucherService.update()
+                .setSql("stock = stock - 1") // set stock = stock - 1
+                .eq("voucher_id", voucherOrder.getVoucherId()).gt("stock", 0) // where id = ? and stock > 0
+                .update();
+        if (!success) {
+            // 扣减失败
+            log.error("库存不足");
+            return ;
+        }
+        save(voucherOrder);
+    }
+
+
+
+    /*// 这里只做查询，不用事务。对数据进行操作才加上事务。
     @Override
     public Result seckillVoucher(Long voucherId) {
         //1、查询优惠券
@@ -80,14 +207,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     //     spring AOP机制实现事务，而实现事务需要获取这个类的代理对象，
     //     而this.createVoucherOrder(voucherId)获得的是VoucherOrderServiceImpl这个对象，不是代理对象
 
-    }
+    }*/
 
-    // 在事务中使用锁，这意味着，尽管当前线程的事务尚未完成，其他线程可能已经能够访问被锁保护的资源，这可能导致数据不一致或其他线程看到未提交的数据。
+
+
+    /*// 在事务中使用锁，这意味着，尽管当前线程的事务尚未完成，其他线程可能已经能够访问被锁保护的资源，这可能导致数据不一致或其他线程看到未提交的数据。
     // 不在函数上加锁，是因为会锁住整个对方法，所有用户共用同一把锁，变成串行执行了，所以要缩小锁的粒度
     @Override
     @Transactional
     public Result createVoucherOrder(Long voucherId) {
-        //     6、充足：扣减库存
+        //  6、充足：扣减库存
         // 6、1 一人一单
         // 6.1.1 查询数据库
         // tip:和乐观锁解决超卖一样，这样先查再向数据库插入数据是存在并发安全问题的
@@ -120,5 +249,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         save(voucherOrder);
         //     8、返回订单id
         return Result.ok(l);
-    }
+    }*/
 }
+
+

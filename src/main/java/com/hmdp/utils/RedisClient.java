@@ -94,7 +94,6 @@ public class RedisClient {
         // 4 没过期返回商铺信息
         RedisData redisData = JSONUtil.toBean(inform, RedisData.class);
         LocalDateTime expireTime = redisData.getExpireTime();
-        // TODO 不可以吧redisData转成string吗
         //
         R r = JSONUtil.toBean((JSONObject) redisData.getData(),type);
         if (expireTime.isAfter(LocalDateTime.now())){

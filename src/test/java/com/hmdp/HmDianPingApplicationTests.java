@@ -39,6 +39,9 @@ class HmDianPingApplicationTests {
     RedisIdWorker redisIdWorker;
     private static final ExecutorService es = Executors.newFixedThreadPool(500);
 
+
+
+
     @Test
     void testUniquId() throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(300);
@@ -75,5 +78,4 @@ class HmDianPingApplicationTests {
         System.out.println(of);
     }
 }
-//生成UUID
-// UUID.randomUUID().toString().replace("-", "").toLowerCase();
+
