@@ -82,7 +82,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 2.5.代金券id
         voucherOrder.setVoucherId(voucherId);
         orderTasks.add(voucherOrder);
-    //     4、返回订单ID
+        //  2.6 获取代理对象
+        // 创建代理对象
+        proxy = (IVoucherOrderService) AopContext.currentProxy();
+        //     4、返回订单ID
         return Result.ok(orderid);
     }
 
@@ -115,8 +118,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             }
         }
     }
-    // 创建代理对象
-    IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+//  proxy放入类的成员变量,让后续线程使用这个代理对象
+    private IVoucherOrderService proxy;
     // 创建订单：使用Redisson分布式可重入锁
     private void handleVoucherOrder(VoucherOrder voucherOrder) {
 //1.获取用户
