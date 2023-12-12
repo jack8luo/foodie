@@ -4,6 +4,7 @@ package com.hmdp.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.UUID;
+import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
@@ -22,6 +23,7 @@ import javax.servlet.http.HttpSession;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import static com.baomidou.mybatisplus.core.toolkit.Wrappers.query;
@@ -60,8 +62,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,User> implements IUs
         if (user == null)
         // 4、不存在，创建用户
         {
-            User user1 = new User();
-            user1.setPhone(phone);
+            //User user1 = new User();
+            //user1.setPhone(phone);
+            user = createUserWithPhone(phone);
 
         }
         UserDTO userDTO = BeanUtil.copyProperties(user,UserDTO.class);
@@ -81,6 +84,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,User> implements IUs
         stringRedisTemplate.expire(LOGIN_USER_KEY,30, TimeUnit.MINUTES);
         // 5.5、返回token
         return Result.ok(token);
+    }
+
+    private User createUserWithPhone(String phone) {
+        User user = new User();
+        user.setPhone(phone);
+        user.setNickName("user_"+ RandomUtil.randomString(10));
+        save(user);
+        return user;
     }
 }
 
