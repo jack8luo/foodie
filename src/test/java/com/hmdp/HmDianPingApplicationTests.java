@@ -1,14 +1,23 @@
 package com.hmdp;
 
+import cn.hutool.core.io.FileUtil;
+import com.hmdp.controller.UserController;
+import com.hmdp.dto.LoginFormDTO;
+import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.impl.ShopServiceImpl;
+import com.hmdp.service.impl.UserServiceImpl;
 import com.hmdp.utils.RedisClient;
 import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mock.web.MockHttpSession;
 
+import javax.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -40,6 +49,29 @@ class HmDianPingApplicationTests {
     private static final ExecutorService es = Executors.newFixedThreadPool(500);
 
 
+    //生成1000个token做压力测试
+    @Autowired
+    UserServiceImpl userService;
+    @Autowired
+    UserController userController;
+    @Test
+    void testlogin(){
+        for (int i = 8889; i <= 9883; i++) {
+            //int转String
+            String token = String.valueOf(i);
+            token = "1877912" + token;
+            System.out.println(RegexUtils.isPhoneInvalid(token));
+            //初始化HttpSession,不然会报错
+            HttpSession session = new MockHttpSession();
+            session.setAttribute("phone",token);
+            userController.sendCode(token,session);
+            String random = UserHolder.getRandom();
+            Result result = userService.login_l(new LoginFormDTO(token, random, ""), session);
+            token = (String) result.getData();
+            // 将token写入tokens.txt文件中
+            FileUtil.appendUtf8String(token+"\n","tokens.txt");
+        }
+    }
 
 
     @Test

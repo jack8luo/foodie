@@ -3,6 +3,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -47,9 +48,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,User> implements IUs
         String code = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY);
         // 1.2、校验手机号
         String phone = loginForm.getPhone();
-        if(!RegexUtils.isPhoneInvalid(phone))
+        if(RegexUtils.isPhoneInvalid(phone))
         {
-            Result.fail("手机号格式错误");
+            return Result.fail("手机号格式错误");
         }
         // 1.3、校验验证码
         if(!code1.equals(code))
@@ -71,6 +72,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,User> implements IUs
         // 5、保存到redis中
         // 5.1、生成唯一key
         String token = UUID.randomUUID().toString(true);
+
         // 5.2、将userDTO转为map结构
         // tip:stringredisTemplate要求系列化过程中要求都是string类型，id是Long
         // Map<String, Object> userMap = BeanUtil.beanToMap(userDTO);

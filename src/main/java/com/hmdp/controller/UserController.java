@@ -63,6 +63,8 @@ public class UserController {
         }
         // 4、生成验证码
         String  random = RandomUtil.randomNumbers(6);
+        // 将random存入ThreadLocal
+        UserHolder.setRandom(random);
         // 5、保存到redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY,random);
         stringRedisTemplate.expire(LOGIN_CODE_KEY,2, TimeUnit.MINUTES);
@@ -90,6 +92,8 @@ public class UserController {
     public Result logout(){
         // TODO 实现登出功能
         return Result.fail("功能未完成");
+        //UserHolder.removeUser();
+        //return Result.ok();
     }
 
     @GetMapping("/me")
