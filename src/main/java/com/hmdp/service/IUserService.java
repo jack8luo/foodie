@@ -18,4 +18,8 @@ import javax.servlet.http.HttpSession;
 public interface IUserService extends IService<User> {
 
     Result login_l(LoginFormDTO loginForm, HttpSession session);
+
+    Result sign();
+
+    Result signCount();
 }
