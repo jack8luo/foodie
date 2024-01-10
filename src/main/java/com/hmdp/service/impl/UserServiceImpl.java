@@ -15,6 +15,7 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -72,7 +73,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,User> implements IUs
         // 5、保存到redis中
         // 5.1、生成唯一key
         String token = UUID.randomUUID().toString(true);
-
+        UserHolder.setRandom(token);
         // 5.2、将userDTO转为map结构
         // tip:stringredisTemplate要求系列化过程中要求都是string类型，id是Long
         // Map<String, Object> userMap = BeanUtil.beanToMap(userDTO);

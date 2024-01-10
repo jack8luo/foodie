@@ -7,4 +7,5 @@ public class SystemConstants {
     public static final int MAX_PAGE_SIZE = 10;
 
     public static final String BLOG_LIKED_KEY = "blog_liked_";
+    public static final String FEED_KEY = "feed_";
 }

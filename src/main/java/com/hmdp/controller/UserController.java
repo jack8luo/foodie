@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.baomidou.mybatisplus.core.toolkit.Wrappers.query;
 import static com.hmdp.utils.RedisConstants.LOGIN_CODE_KEY;
+import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 
 /**
  * <p>
@@ -87,7 +88,7 @@ public class UserController {
         // 4、生成验证码
         String  random = RandomUtil.randomNumbers(6);
         // 将random存入ThreadLocal
-        UserHolder.setRandom(random);
+        //UserHolder.setRandom(random);
         // 5、保存到redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY,random);
         stringRedisTemplate.expire(LOGIN_CODE_KEY,2, TimeUnit.MINUTES);
@@ -113,10 +114,13 @@ public class UserController {
      */
     @PostMapping("/logout")
     public Result logout(){
-        // TODO 实现登出功能
-        return Result.fail("功能未完成");
-        //UserHolder.removeUser();
-        //return Result.ok();
+        //// TODO 实现登出功能
+        //return Result.fail("功能未完成");
+        //String random = UserHolder.getRandom();
+        ////删除redis中的验证码
+        //stringRedisTemplate.delete(LOGIN_USER_KEY+random);
+        UserHolder.removeUser();
+        return Result.ok();
     }
 
     @GetMapping("/me")

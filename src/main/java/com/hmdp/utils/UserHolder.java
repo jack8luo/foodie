@@ -12,9 +12,9 @@ public class UserHolder {
         tl2.set(random);
     }
     //获取String类型的方法
-    public static String getRandom() {
-        return tl2.get();
-    }
+    public static String getRandom() { return tl2.get(); }
+
+
 
     public static void saveUser(UserDTO user){
         tl.set(user);
